@@ -76,9 +76,9 @@ The experiments using real-world datasets require the user to run the driver scr
 
 This repository includes detailed demonstrations to walk the user through re-creating the results in the paper cited at the top of this document. Below is a list of demo links which give our demos (constructed in Jupyter notebook form) rendered using the useful <a href="https://github.com/jupyter/nbviewer">nbviewer</a> service.
 
+- <a href="https://nbviewer.jupyter.org/github/feedbackward/bdd/blob/main/bdd/barron.ipynb">Barron dispersion function analysis</a> (sections 2-3)
 - <a href="https://nbviewer.jupyter.org/github/feedbackward/bdd/blob/main/bdd/risk_comparison.ipynb">Risk comparison</a> (section 5.1 in paper)
 - <a href="https://nbviewer.jupyter.org/github/feedbackward/bdd/blob/main/bdd/2D_classification.ipynb">2-dim classification tests using simulated data</a> (section 5.2)
-- <a href="https://nbviewer.jupyter.org/github/feedbackward/bdd/blob/main/bdd/barron.ipynb">Barron dispersion function analysis</a> (sections 2-3)
 - <a href="https://nbviewer.jupyter.org/github/feedbackward/bdd/blob/main/bdd/loss_distributions.ipynb">Analysis of loss distributions</a> (section 5.2)
 - <a href="https://nbviewer.jupyter.org/github/feedbackward/bdd/blob/main/bdd/outliers_1D_reg.ipynb">Impact of outliers (1D regression example)</a> (section 5.3)
 - <a href="https://nbviewer.jupyter.org/github/feedbackward/bdd/blob/main/bdd/real_data.ipynb">Tests using real data benchmarks</a> (section 5.4)
