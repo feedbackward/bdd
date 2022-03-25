@@ -1,8 +1,8 @@
 '''Setup: preparation of data sets.'''
 
 ## External modules.
-from os.path import join
-from pathlib import Path
+import os
+import pathlib
 
 ## Internal modules.
 from mml.data import dataset_dict, dataset_list, get_data_general
@@ -12,9 +12,7 @@ from mml.data import dataset_dict, dataset_list, get_data_general
 
 
 ## If benchmark data is to be used, specify the directory here.
-dir_data_toread = join(str(Path.home()),
-                       "Dropbox", "research", "code",
-                       "dev", "mml-dev", "mml", "data")
+dir_data_toread = os.path.join(str(pathlib.Path.home()))
 
 ## First set dataset parameter dictionary with standard values
 ## for all the benchmark datasets in mml.

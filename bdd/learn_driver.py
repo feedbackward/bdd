@@ -1,4 +1,4 @@
-'''Driver script for tests of CVaR-based learning algorithms.'''
+'''Driver script for tests of learning algorithms under diverse risks.'''
 
 ## External modules.
 from argparse import ArgumentParser
