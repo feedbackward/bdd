@@ -2,7 +2,7 @@
 
 ## External modules.
 import os
-import pathlib
+from pathlib import Path
 
 ## Internal modules.
 from mml.data import dataset_dict, dataset_list, get_data_general
@@ -12,7 +12,8 @@ from mml.data import dataset_dict, dataset_list, get_data_general
 
 
 ## If benchmark data is to be used, specify the directory here.
-dir_data_toread = os.path.join(str(pathlib.Path.home()))
+dir_data_toread = os.path.join(str(Path.home()),
+                               "mml", "mml", "data")
 
 ## First set dataset parameter dictionary with standard values
 ## for all the benchmark datasets in mml.
