@@ -1,6 +1,4 @@
-# bdd
-bdd: bidirectional dispersion and risk function design
-
+# bdd: bidirectional dispersion and risk function design
 
 ## Software setup
 
