@@ -159,6 +159,66 @@ class T_Risk(Loss):
         return loss_grads
 
 
+class T_Risk_General(Loss):
+    '''
+    Generalized form of the T-risk, where the threshold
+    theta is specified at construction, and is not a
+    parameter to be optimized.
+    '''
+    def __init__(self, loss_base, dispersion, dispersion_d1,
+                 theta, sigma=None, etatilde=None, name=None):
+        loss_name = "R_Risk x {}".format(str(loss_base))
+        super().__init__(name=loss_name)
+        self.loss = loss_base
+        self.dispersion = dispersion
+        self.dispersion_d1 = dispersion_d1
+        self.theta = theta
+        self.sigma = sigma
+        self.etatilde = etatilde
+        return None
+    
+    
+    def func(self, model, X, y):
+        '''
+        '''
+        losses = self.loss(model=model, X=X, y=y) # compute losses.
+        return self.etatilde * self.theta + self.dispersion(
+            x=losses-self.theta,
+            sigma=self.sigma
+        )
+    
+    
+    def grad(self, model, X, y):
+        '''
+        '''
+        
+        ## Initial computations.
+        losses = self.loss(model=model, X=X, y=y) # compute losses.
+        loss_grads = self.loss.grad(model=model, X=X, y=y) # loss gradients.
+        dispersion_grads = self.dispersion_d1(
+            x=losses-self.theta,
+            sigma=self.sigma
+        ) # evaluate the derivative of the dispersion term.
+        ddim = dispersion_grads.ndim
+        
+        ## Main gradient computations.
+        for pn, g in loss_grads.items():
+            gdim = g.ndim
+            if ddim > gdim:
+                raise ValueError("Axis dimensions are wrong; ddim > gdim.")
+            elif ddim < gdim:
+                dispersion_grads_exp = expand_dims(
+                    a=dispersion_grads,
+                    axis=tuple(range(ddim,gdim))
+                )
+                g *= dispersion_grads_exp
+            else:
+                g *= dispersion_grads
+
+        ## Return gradients for all parameters being optimized.
+        return loss_grads
+
+
 class ConvexPolynomial(Loss):
     '''
     '''
