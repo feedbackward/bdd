@@ -2,6 +2,7 @@
 
 ## External modules.
 import numpy as np
+from scipy.special import gamma as gamma_fn
 
 ## Internal modules.
 from setup_dispersions import dispersion_barron
@@ -20,6 +21,15 @@ def obfn_rrisk(theta, x, paras):
     dispersion = get_disp_barron(alpha=paras["alpha"])
     sigma = paras["sigma"]
     return np.mean(x) + eta * np.mean(dispersion(x=(x-theta)/sigma))
+
+
+def obfn_mloc(theta, x, paras):
+    '''
+    For M-location.
+    '''
+    dispersion = get_disp_barron(alpha=paras["alpha"])
+    sigma = paras["sigma"]
+    return np.mean(dispersion(x=(x-theta)/sigma))
 
 
 def obfn_trisk(theta, x, paras):
@@ -77,7 +87,11 @@ def obfn_dro(theta, x, paras):
 def get_obfn(name):
     if name == "rrisk":
         return obfn_rrisk
+    elif name == "mloc":
+        return obfn_mloc
     elif name == "trisk":
+        return obfn_trisk
+    elif name == "triskminus":
         return obfn_trisk
     elif name == "trisk1way":
         return obfn_trisk1way
@@ -124,7 +138,11 @@ def bracket_prep(x, paras, obfn_name, verbose):
     ## Prepare the relevant objective function.
     if obfn_name == "rrisk":
         obfn = lambda theta: obfn_rrisk(theta=theta, x=x, paras=paras)
+    elif obfn_name == "mloc":
+        obfn = lambda theta: obfn_mloc(theta=theta, x=x, paras=paras)
     elif obfn_name == "trisk":
+        obfn = lambda theta: obfn_trisk(theta=theta, x=x, paras=paras)
+    elif obfn_name == "triskminus":
         obfn = lambda theta: obfn_trisk(theta=theta, x=x, paras=paras)
     elif obfn_name == "trisk1way":
         obfn = lambda theta: obfn_trisk1way(theta=theta, x=x, paras=paras)
@@ -183,11 +201,17 @@ def gen_data(n, name, rg):
     elif name == "gamma":
         shape, scale = (4.0, 1.0)
         return rg.gamma(shape=shape, scale=scale, size=(n,1))
+    elif name == "gamma-unitvar":
+        shape, scale = (1.0, 1.0)
+        return rg.gamma(shape=shape, scale=scale, size=(n,1))
     elif name == "lognormal":
         mean, sigma = (0.0, 0.5)
         return rg.lognormal(mean=mean, sigma=sigma, size=(n,1))
     elif name == "normal":
         loc, scale = (0.0, 1.0)
+        return rg.normal(loc=loc, scale=scale, size=(n,1))
+    elif name == "normal-sharp":
+        loc, scale = (0.0, 0.5)
         return rg.normal(loc=loc, scale=scale, size=(n,1))
     elif name == "pareto":
         a = 3.5
@@ -201,6 +225,10 @@ def gen_data(n, name, rg):
     elif name == "weibull":
         a = 1.2
         return rg.weibull(a=a, size=(n,1))
+    elif name == "weibull-unitvar":
+        a = 1.2
+        rescaler = 1.0 / np.sqrt(gamma_fn(1+2/a)-gamma_fn(1+1/a)**2)
+        return rescaler*rg.weibull(a=a, size=(n,1))
     else:
         return None
 

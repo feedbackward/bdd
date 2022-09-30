@@ -25,11 +25,13 @@ def get_model(name, paras_init=None, rg=None, **kwargs):
                                      paras_init=paras_init, rg=rg)
     else:
         raise ValueError("Please pass a valid model name.")
-
+    
     ## As needed, initialize any extra parameters.
     no_theta = "theta" not in model_out.paras
+    needs_theta = ["rrisk", "trisk", "dro", "meanvar",
+                   "triskSigS", "triskSigM", "triskSigL"]
     no_v = "v" not in model_out.paras
-    if kwargs["risk_name"] in ["rrisk", "trisk", "dro"] and no_theta:
+    if kwargs["risk_name"] in needs_theta and no_theta:
         model_out.paras["theta"] = rg.uniform(low=0.0,
                                               high=init_range,
                                               size=(1,1))

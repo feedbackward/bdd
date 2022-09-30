@@ -21,6 +21,7 @@ def train_epoch(algo, loss, X, y, batch_size=None,
     idx_stop = min(batch_size, n)
     
     ## Run the algorithm for one epoch.
+    algo.start_epoch(X=X, y=y)
     for onestep in algo:
         algo.update(X=X[idx_start:idx_stop,:],
                     y=y[idx_start:idx_stop,:])

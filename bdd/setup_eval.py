@@ -1,11 +1,12 @@
 '''Setup: post-training evaluation of performance.'''
 
 ## External modules.
-from numpy import median, nan, savetxt
-from numpy.linalg import norm
+import numpy as np
+from sklearn.metrics import confusion_matrix
 
 ## Internal modules.
 from mml.losses.classification import Zero_One
+from mml.utils.linalg import onehot
 
 
 ###############################################################################
@@ -44,11 +45,15 @@ def get_eval(loss_base=None, loss=None, **kwargs):
     if kwargs["type"] == "classification":
         loss_01 = Zero_One()
         eval_loss_01 = lambda model, X, y: loss_01(model=model, X=X, y=y)
-        evaluators.update({"zeroone": eval_loss_01})
+        eval_confusion = lambda model, X, y: confusion(model=model, X=X, y=y)
+        evaluators.update({"zeroone": eval_loss_01,
+                           "confuse": eval_confusion})
     
     ## Finally, for reference we will record two norms.
-    eval_l1 = lambda model, X, y: norm(model.paras["w"].reshape(-1), ord=1)
-    eval_l2 = lambda model, X, y: norm(model.paras["w"].reshape(-1), ord=2)
+    eval_l1 = lambda model, X, y: np.linalg.norm(model.paras["w"].reshape(-1),
+                                                 ord=1)
+    eval_l2 = lambda model, X, y: np.linalg.norm(model.paras["w"].reshape(-1),
+                                                 ord=2)
     evaluators.update({"l1": eval_l1, "l2": eval_l2})
     
     return evaluators
@@ -69,17 +74,21 @@ def eval_model(epoch, model, storage, data,
                 if key_data == "test" and save_dist:
                     store[key_eval] = evaluator(model=model,
                                                 X=X, y=y).reshape(-1)
+            elif key_eval == "confuse":
+                ## For confusion matrix, shape is special.
+                store[key_eval][epoch,:] = evaluator(model=model,
+                                                     X=X, y=y)
             else:
                 ## For all other evaluators, just save summary statistics.
                 if key_eval == "obj" and risk_name in ["dro", "entropic"]:
                     store[key_eval][epoch,0] = evaluator(model=model,
                                                          X=X, y=y)
-                    store[key_eval][epoch,1] = nan
-                    store[key_eval][epoch,2] = nan
+                    store[key_eval][epoch,1] = np.nan
+                    store[key_eval][epoch,2] = np.nan
                 else:
                     evaluations = evaluator(model=model, X=X, y=y)
                     store[key_eval][epoch,0] = evaluations.mean()
-                    store[key_eval][epoch,1] = median(evaluations)
+                    store[key_eval][epoch,1] = np.median(evaluations)
                     store[key_eval][epoch,2] = evaluations.std()
     return None
 
@@ -109,9 +118,25 @@ def eval_write(fname, storage):
     for key_data, store in storage.items():
         for key_eval in store.keys():
             if store[key_eval] is not None:
-                savetxt(fname=".".join([fname, key_eval+"_"+key_data]),
-                        X=store[key_eval], fmt="%.7e", delimiter=",")
+                if key_eval == "confuse":
+                    ## For confusion matrix, store only FINAL epoch.
+                    to_write = store[key_eval][-1,:]
+                else:
+                    to_write = store[key_eval]
+                np.savetxt(fname=".".join([fname, key_eval+"_"+key_data]),
+                           X=to_write, fmt="%.7e", delimiter=",")
     return None
+
+
+## Helper function for confusion matrix computation.
+
+def confusion(model, X, y):
+    return confusion_matrix(
+        y_true=y.argmax(axis=1),
+        y_pred=model(X=X).argmax(axis=1),
+        labels=np.arange(y.shape[1]),
+        normalize="all"
+    )
 
 
 ###############################################################################

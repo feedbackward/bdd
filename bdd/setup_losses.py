@@ -2,7 +2,7 @@
 
 ## External modules.
 from copy import deepcopy
-from numpy import absolute, expand_dims, sign
+import numpy as np
 
 ## Internal modules.
 from mml.losses import Loss
@@ -13,6 +13,7 @@ from mml.losses.dro import DRO_CR
 from mml.losses.logistic import Logistic
 from mml.losses.quadratic import Quadratic
 from mml.losses.tilted import Tilted
+from mml.utils.mest import est_loc_fixedpt, scale_madmed
 from setup_dispersions import get_dispersion
 
 
@@ -71,7 +72,7 @@ class R_Risk(Loss):
             if ddim > gdim:
                 raise ValueError("Axis dimensions are wrong; ddim > gdim.")
             elif ddim < gdim:
-                dispersion_grads_exp = expand_dims(
+                dispersion_grads_exp = np.expand_dims(
                     a=dispersion_grads,
                     axis=tuple(range(ddim,gdim))
                 )
@@ -81,7 +82,7 @@ class R_Risk(Loss):
         
         ## Compute the derivative with respect to threshold theta.
         ## (be careful to note the minus sign)
-        loss_grads["theta"] = -self.eta * expand_dims(
+        loss_grads["theta"] = -self.eta * np.expand_dims(
             a=dispersion_grads,
             axis=tuple(range(ddim,1+tdim))
         ) / self.sigma
@@ -98,7 +99,7 @@ class T_Risk(Loss):
     '''
     def __init__(self, loss_base, dispersion, dispersion_d1,
                  sigma=None, etatilde=None, name=None):
-        loss_name = "R_Risk x {}".format(str(loss_base))
+        loss_name = "T_Risk x {}".format(str(loss_base))
         super().__init__(name=loss_name)
         self.loss = loss_base
         self.dispersion = dispersion
@@ -140,7 +141,7 @@ class T_Risk(Loss):
             if ddim > gdim:
                 raise ValueError("Axis dimensions are wrong; ddim > gdim.")
             elif ddim < gdim:
-                dispersion_grads_exp = expand_dims(
+                dispersion_grads_exp = np.expand_dims(
                     a=dispersion_grads,
                     axis=tuple(range(ddim,gdim))
                 )
@@ -150,7 +151,7 @@ class T_Risk(Loss):
 
         ## Compute the derivative with respect to threshold theta.
         ## (be careful to note the minus sign)
-        loss_grads["theta"] = self.etatilde - expand_dims(
+        loss_grads["theta"] = self.etatilde - np.expand_dims(
             a=dispersion_grads,
             axis=tuple(range(ddim,1+tdim))
         ) / self.sigma
@@ -167,7 +168,7 @@ class T_Risk_General(Loss):
     '''
     def __init__(self, loss_base, dispersion, dispersion_d1,
                  theta, sigma=None, etatilde=None, name=None):
-        loss_name = "R_Risk x {}".format(str(loss_base))
+        loss_name = "T_Risk_General x {}".format(str(loss_base))
         super().__init__(name=loss_name)
         self.loss = loss_base
         self.dispersion = dispersion
@@ -207,7 +208,86 @@ class T_Risk_General(Loss):
             if ddim > gdim:
                 raise ValueError("Axis dimensions are wrong; ddim > gdim.")
             elif ddim < gdim:
-                dispersion_grads_exp = expand_dims(
+                dispersion_grads_exp = np.expand_dims(
+                    a=dispersion_grads,
+                    axis=tuple(range(ddim,gdim))
+                )
+                g *= dispersion_grads_exp
+            else:
+                g *= dispersion_grads
+
+        ## Return gradients for all parameters being optimized.
+        return loss_grads
+
+
+class T_Risk_CustomThreshold(Loss):
+    '''
+    Generalized form of the T-risk, where the threshold
+    theta is determined internally based on loss/grad stats
+    computed by a function passed at construction time.
+    '''
+    def __init__(self, loss_base, dispersion, dispersion_d1, set_threshold,
+                 sigma=None, etatilde=None, name=None):
+        loss_name = "T_Risk_CustomThreshold x {}".format(str(loss_base))
+        super().__init__(name=loss_name)
+        self.loss = loss_base
+        self.dispersion = dispersion
+        self.dispersion_d1 = dispersion_d1
+        self.theta = None
+        self.sigma = sigma
+        self.etatilde = etatilde
+        self.set_threshold = set_threshold
+        return None
+
+
+    def update_threshold(self, model, X, y):
+        '''
+        '''
+        losses = self.loss(model=model, X=X, y=y) # compute base losses.
+        self.theta = self.set_threshold(x=losses) # set new threshold.
+        self.sigma = scale_madmed(X=losses) # use MAD about median.
+        return None
+
+
+    def func(self, model, X, y):
+        '''
+        '''
+        ## Set the threshold value if it is not set already.
+        if self.theta is None:
+            self.update_threshold(model=model, X=X, y=y)
+        
+        ## Loss computations.
+        losses = self.loss(model=model, X=X, y=y) # compute base losses.
+        return self.etatilde * self.theta + self.dispersion(
+            x=losses-self.theta,
+            sigma=self.sigma
+        )
+    
+    
+    def grad(self, model, X, y):
+        '''
+        '''
+        
+        ## Set the threshold value if it is not set already.
+        if self.theta is None:
+            self.update_threshold(model=model, X=X, y=y)
+        
+        ## Initial computations.
+        losses = self.loss(model=model, X=X, y=y) # compute base losses.
+        loss_grads = self.loss.grad(model=model, X=X, y=y) # loss gradients.
+        dispersion_grads = self.dispersion_d1(
+            x=losses-self.theta,
+            sigma=self.sigma
+        ) # evaluate the derivative of the dispersion term.
+        ddim = dispersion_grads.ndim
+        
+        ## Main gradient computations.
+        for pn, g in loss_grads.items():
+            gdim = g.ndim
+            if ddim > gdim:
+                raise ValueError("Axis dimensions are wrong; ddim > gdim.")
+            elif ddim < gdim:
+                dispersion_grads_exp = np.expand_dims(
                     a=dispersion_grads,
                     axis=tuple(range(ddim,gdim))
                 )
@@ -234,7 +314,7 @@ class ConvexPolynomial(Loss):
     def func(self, model, X, y):
         '''
         '''
-        abdiffs = absolute(model(X=X)-y)
+        abdiffs = np.absolute(model(X=X)-y)
         if self.exponent == 1.0:
             return abdiffs
         else:
@@ -249,9 +329,9 @@ class ConvexPolynomial(Loss):
         diffs = model(X=X)-y
         
         if self.exponent == 1.0:
-            factors = sign(diffs)
+            factors = np.sign(diffs)
         else:
-            factors = absolute(diffs)**(self.exponent-1.0) * sign(diffs)
+            factors = np.absolute(diffs)**(self.exponent-1.0) * np.sign(diffs)
         
         ## Shape check to be safe.
         if factors.ndim != 2:
@@ -260,8 +340,8 @@ class ConvexPolynomial(Loss):
             raise ValueError("Only implemented for single-output models.")
         else:
             for pn, g in loss_grads.items():
-                g *= expand_dims(a=factors,
-                                 axis=tuple(range(2,g.ndim)))
+                g *= np.expand_dims(a=factors,
+                                    axis=tuple(range(2,g.ndim)))
         return loss_grads
 
 
@@ -270,6 +350,25 @@ def parse_dro(atilde):
     shape = 2.0
     bound = ((1.0/(1.0-atilde))-1.0)**2.0 / 2.0
     return (bound, shape)
+
+
+## Parser function for threshold setters.
+def parse_threshold_setter(name, dispersion_d1=None, sigma=None):
+    if name == "mean":
+        return lambda x: np.mean(x)
+    elif name == "median":
+        return lambda x: np.median(x)
+    elif name == "mest":
+        if dispersion_d1 is None or sigma is None:
+            s_error = "Missing dispersion_d1 or sigma for M-estimation."
+            raise ValueError(s_error)
+        else:
+            inf_fn = lambda x: dispersion_d1(x=x, sigma=1.0)
+            return lambda x: est_loc_fixedpt(X=x, s=sigma,
+                                             inf_fn=inf_fn)
+    else:
+        s_error = "Did not recognize threshold setter {}".format(name)
+        raise ValueError(s_error)
 
 
 ## Grab the desired loss object.
@@ -299,7 +398,8 @@ def get_loss(name, **kwargs):
     if risk_name == "erm":
         loss = loss_base
     
-    elif risk_name in ["rrisk", "trisk"]:
+    elif risk_name in ["rrisk", "trisk", "triskSigS",
+                       "triskSigM", "triskSigL", "meanvar"]:
         
         dispersion_kwargs = {"interpolate": kwargs["interpolate"],
                              "alpha": kwargs["alpha"],
@@ -320,7 +420,23 @@ def get_loss(name, **kwargs):
                           dispersion_d1=dispersion_d1,
                           sigma=kwargs["sigma"],
                           etatilde=kwargs["etatilde"])
-    
+
+    elif risk_name in ["triskCustom"]:
+        dispersion_kwargs = {"interpolate": kwargs["interpolate"],
+                             "alpha": kwargs["alpha"],
+                             "beta": kwargs["beta"]}
+        dispersion, dispersion_d1 = get_dispersion(
+            name=kwargs["dispersion"], **dispersion_kwargs
+        )
+        set_threshold = parse_threshold_setter(name=kwargs["set_threshold"],
+                                               dispersion_d1=dispersion_d1,
+                                               sigma=kwargs["sigma"])
+        loss = T_Risk_CustomThreshold(loss_base=loss_base,
+                                      dispersion=dispersion,
+                                      dispersion_d1=dispersion_d1,
+                                      set_threshold=set_threshold,
+                                      sigma=kwargs["sigma"],
+                                      etatilde=kwargs["etatilde"])
     elif risk_name == "cvar":
         loss = CVaR(loss_base=loss_base,
                     alpha=1.0-kwargs["prob"])

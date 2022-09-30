@@ -67,11 +67,14 @@ parser.add_argument("--interpolate",
                     help="Flag for automated interpolator (default: False).",
                     action="store_true", default=False)
 parser.add_argument("--loss-base",
-                    help="Loss name. (default: quadratic)",
+                    help="Loss name (default: quadratic).",
                     type=str, default="quadratic", metavar="S")
 parser.add_argument("--model",
-                    help="Model class. (default: linreg)",
+                    help="Model class (default: linreg).",
                     type=str, default="linreg", metavar="S")
+parser.add_argument("--noise-rate",
+                    help="Noisy label rate (default: 0.0).",
+                    type=float, default=0.0, metavar="F")
 parser.add_argument("--num-epochs",
                     help="Number of epochs to run (default: 3)",
                     type=int, default=3, metavar="N")
@@ -84,6 +87,9 @@ parser.add_argument("--prob",
 parser.add_argument("--risk-name",
                     help="Risk function name. Default is 'mean'.",
                     type=str, default="mean", metavar="S")
+parser.add_argument("--set-threshold",
+                    help="Name of threshold setter (default: 'none').",
+                    type=str, default="none", metavar="S")
 parser.add_argument("--save-dist",
                     help="Save loss distribution or not. (default: 'no')",
                     type=str, default="no", metavar="S")
@@ -91,10 +97,10 @@ parser.add_argument("--sigma",
                     help="Scale sigma for R-risk and T-risk (default: 1.0).",
                     type=float, default=1.0, metavar="F")
 parser.add_argument("--step-size",
-                    help="Step size parameter (default: 0.01)",
+                    help="Step size parameter (default: 0.01).",
                     type=float, default=0.01, metavar="F")
 parser.add_argument("--task-name",
-                    help="A task name. Default is the word default.",
+                    help="A task name. Default is the word 'default'.",
                     type=str, default="default", metavar="S")
 
 ## Parse the arguments passed via command line.
@@ -111,7 +117,10 @@ if len(args.algo_main) > 0:
     towrite_name += "_{}".format(args.algo_main)
 
 ## Prepare a directory to save results.
-towrite_dir = path.join(results_dir, args.data)
+if args.noise_rate > 0.0:
+    towrite_dir = path.join(results_dir, args.data+"-noisy")
+else:
+    towrite_dir = path.join(results_dir, args.data)
 makedir_safe(towrite_dir)
 
 ## Setup of manually-specified seed sequence for data generation.
@@ -143,6 +152,7 @@ if __name__ == "__main__":
         "gamma": args.gamma,
         "interpolate": args.interpolate,
         "prob": args.prob,
+        "set_threshold": args.set_threshold,
         "sigma": args.sigma,
         "risk_name": args.risk_name
     }
@@ -158,7 +168,7 @@ if __name__ == "__main__":
     
     ## Start the loop over independent trials.
     for trial in range(args.num_trials):
-
+        
         ## Get trial-specific random generator.
         rg_data = rg_data_children[trial]
         rg_mth = rg_mth_children[trial]
@@ -166,7 +176,9 @@ if __name__ == "__main__":
         ## Load in data.
         print("Doing data prep.")
         (X_train, y_train, X_val, y_val,
-         X_test, y_test, ds_paras) = get_data(dataset=args.data, rg=rg_data)
+         X_test, y_test, ds_paras) = get_data(
+             dataset=args.data, rg=rg_data, noisy_label_rate=args.noise_rate
+         )
         
         ## Data index.
         data_idx = np.arange(len(X_train))
@@ -218,6 +230,21 @@ if __name__ == "__main__":
                 store_train[key_eval] = None
                 store_val[key_eval] = None
                 store_test[key_eval] = None
+            elif key_eval == "confuse":
+                ## In this case, store full confusion matrix.
+                num_classes = y_train.shape[1]
+                store_train[key_eval] = np.zeros(shape=(num_records,
+                                                        num_classes,
+                                                        num_classes),
+                                                 dtype=np.float32)
+                store_val[key_eval] = np.zeros(shape=(num_records,
+                                                      num_classes,
+                                                      num_classes),
+                                               dtype=np.float32)
+                store_test[key_eval] = np.zeros(shape=(num_records,
+                                                       num_classes,
+                                                       num_classes),
+                                                dtype=np.float32)
             else:
                 ## Just store three stats: mean, median, and stdev. 
                 store_train[key_eval] = np.zeros(shape=(num_records,3),

@@ -24,8 +24,8 @@ class Weighted_Average(Algorithm):
         self.model_ancillary = model_ancillary
         self.weight_sum = 1.0
         return None
-
-
+    
+    
     def update(self, X=None, y=None):
         for pn, p in self.paras.items():
             p *= self.weight_sum
@@ -56,7 +56,11 @@ class GD_ERM_Tilted(GD_ERM):
     def newdir(self, X=None, y=None):
         
         ## Factor to multiply computed using the average (modified) loss.
-        scale = 1.0/(self.tilt*np.mean(self.loss(model=self.model, X=X, y=y)))
+        scale_recip = self.tilt*np.mean(self.loss(model=self.model, X=X, y=y))
+        if scale_recip == 0.0:
+            scale = 0.0
+        else:
+            scale = 1.0 / scale_recip
         
         ## Modified loss gradients.
         loss_grads = self.loss.grad(model=self.model, X=X, y=y)
@@ -112,7 +116,39 @@ class GD_ERM_DRO_CR(GD_ERM):
             else:
                 newdirs[pn] = -scale*g.mean(axis=0, keepdims=False)
         return newdirs
-        
+
+
+class GD_ERM_CustomThreshold(GD_ERM):
+    '''
+    Modified version of GD_ERM that updates
+    the threshold parameter "theta" by a
+    pre-specified function.
+    '''
+
+    def __init__(self, step_coef=None, model=None, loss=None, name=None):
+        super().__init__(step_coef=step_coef, model=model,
+                         loss=loss, name=name)
+        return None
+
+
+    def start_epoch(self, X=None, y=None):
+        '''
+        Critically assumes a loss of the class T_Risk_CustomThreshold,
+        which has a handy update_theta() method.
+        '''
+        self.loss.update_threshold(model=self.model, X=X, y=y)
+        return None
+
+    
+    def newdir(self, X=None, y=None):
+        ## Compute gradients.
+        loss_grads = self.loss.grad(model=self.model, X=X, y=y)
+        ## Update as per usual.
+        newdirs = {}
+        for pn, g in loss_grads.items():
+            newdirs[pn] = -g.mean(axis=0, keepdims=False)
+        return newdirs
+
 
 ## Simple parser for algorithm objects.
 
@@ -132,6 +168,10 @@ def get_algo(name, model, loss, name_main=None, model_main=None, **kwargs):
                                  step_coef=kwargs["step_size"],
                                  model=model,
                                  loss=loss)
+        elif kwargs["risk_name"] in ["triskCustom"]:
+            algo = GD_ERM_CustomThreshold(step_coef=kwargs["step_size"],
+                                          model=model,
+                                          loss=loss)
         else:
             algo = GD_ERM(step_coef=kwargs["step_size"],
                           model=model,
