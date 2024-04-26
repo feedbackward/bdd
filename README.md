@@ -2,7 +2,7 @@
 
 In this repository, we provide software and demonstrations related to the following paper:
 
-- <a href="https://arxiv.org/abs/2203.14434">Flexible risk design using bi-directional dispersion</a>. Matthew J. Holland. AISTATS 2023 (to appear).
+- <a href="https://proceedings.mlr.press/v206/holland23a.html">Flexible risk design using bi-directional dispersion</a>. Matthew J. Holland, AISTATS 2023.
 
 This repository contains code which can be used to faithfully reproduce all the experimental results given in the above paper, and it can be easily applied to more general machine learning tasks outside the examples considered here.
 
